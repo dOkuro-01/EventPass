@@ -1,3 +1,24 @@
 spring:
   application:
     name: tickets
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/eventpass_tickets?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC}
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:RootDemo123!}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+
+server:
+  port: ${SERVER_PORT:8082}
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:Q2xhdmVEZURlbW9QYXJhSmF2YU5vYmVDb25Eb2NrZXIyMDI2IQ==}
+    expiration-ms: ${JWT_EXPIRATION_MS:300000}
