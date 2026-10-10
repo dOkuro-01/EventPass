@@ -1,0 +1,93 @@
+version: '3.8'
+
+networks:
+  eventpass-net:
+    driver: bridge
+
+services:
+  # Servicio de Base de Datos MySQL
+  mysql-db:
+    image: mysql:8.4
+    container_name: eventpass-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: RootDemo123!
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      # Script opcional para inicializar las 4 bases de datos automáticamente si lo deseas:
+      # - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - eventpass-net
+
+  # 1. Microservicio de Autenticación (Puerto 8083)
+  autenticacion:
+    build: ./autenticacion
+    container_name: service-autenticacion
+    restart: always
+    ports:
+      - "8083:8083"
+    environment:
+      - SERVER_PORT=8083
+      - DB_URL=jdbc:mysql://mysql-db:3306/eventpass_usuarios?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+      - DB_USER=root
+      - DB_PASSWORD=RootDemo123!
+    depends_on:
+      - mysql-db
+    networks:
+      - eventpass-net
+
+  # 2. Microservicio de Eventos (Puerto 8084)
+  eventos:
+    build: ./eventos
+    container_name: service-eventos
+    restart: always
+    ports:
+      - "8084:8084"
+    environment:
+      - SERVER_PORT=8084
+      - DB_URL=jdbc:mysql://mysql-db:3306/eventpass_eventos?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+      - DB_USER=root
+      - DB_PASSWORD=RootDemo123!
+    depends_on:
+      - mysql-db
+    networks:
+      - eventpass-net
+
+  # 3. Microservicio de Órdenes (Puerto 8081)
+  ordenes:
+    build: ./ordenes
+    container_name: service-ordenes
+    restart: always
+    ports:
+      - "8081:8081"
+    environment:
+      - SERVER_PORT=8081
+      - DB_URL=jdbc:mysql://mysql-db:3306/eventpass_ordenes?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+      - DB_USER=root
+      - DB_PASSWORD=RootDemo123!
+    depends_on:
+      - mysql-db
+    networks:
+      - eventpass-net
+
+  # 4. Microservicio de Tickets (Puerto 8082)
+  tickets:
+    build: ./tickets
+    container_name: service-tickets
+    restart: always
+    ports:
+      - "8082:8082"
+    environment:
+      - SERVER_PORT=8082
+      - DB_URL=jdbc:mysql://mysql-db:3306/eventpass_tickets?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+      - DB_USER=root
+      - DB_PASSWORD=RootDemo123!
+    depends_on:
+      - mysql-db
+    networks:
+      - eventpass-net
+
+volumes:
+  mysql_data:
