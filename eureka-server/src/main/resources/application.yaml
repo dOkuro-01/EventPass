@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: eureka-server
+
+server:
+  port: ${PORT:8761}
+
+eureka:
+  instance:
+    # En contenedores/nube suele evitar problemas de nombres de host internos no resolubles
+    prefer-ip-address: true
+    # Si tu plataforma exige o expone un hostname concreto, descomenta y usa variable de entorno:
+    # hostname: ${EUREKA_INSTANCE_HOSTNAME:localhost}
+  client:
+    # Servidor standalone: no se registra a sí mismo ni descarga registro externo
+    register-with-eureka: false
+    fetch-registry: false
+    service-url:
+      defaultZone: http://localhost:${server.port}/eureka/
+  server:
+    # En entornos de prueba/nube con reinicios frecuentes ayuda a no retener instancias caídas por tanto tiempo
+    # En producción estricta evalúa dejarlo en true según el comportamiento de tu red
+    enable-self-preservation: false
