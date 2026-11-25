@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      mvc:
+        routes:
+          - id: autenticacion-route
+            uri: lb://autenticacion
+            predicates:
+              - Path=/api/auth/**
+          - id: eventos-route
+            uri: lb://eventos
+            predicates:
+              - Path=/api/eventos/**
+          - id: ordenes-route
+            uri: lb://ordenes
+            predicates:
+              - Path=/api/ordenes/**
+          - id: tickets-route
+            uri: lb://tickets
+            predicates:
+              - Path=/api/tickets/**
+
+server:
+  port: ${SERVER_PORT:8080}
+
+eureka:
+  instance:
+    prefer-ip-address: true
+  client:
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
