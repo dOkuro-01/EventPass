@@ -1,0 +1,4 @@
+CREATE DATABASE IF NOT EXISTS eventpass_usuarios;
+CREATE DATABASE IF NOT EXISTS eventpass_eventos;
+CREATE DATABASE IF NOT EXISTS eventpass_ordenes;
+CREATE DATABASE IF NOT EXISTS eventpass_tickets;

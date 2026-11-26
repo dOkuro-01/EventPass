@@ -25,3 +25,8 @@ app:
   demo:
     username: ${APP_DEMO_USERNAME:admin}
     password: ${APP_DEMO_PASSWORD:admin123}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://localhost:8761/eureka/}}

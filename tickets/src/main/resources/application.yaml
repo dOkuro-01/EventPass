@@ -22,3 +22,8 @@ app:
   jwt:
     secret: ${JWT_SECRET:Q2xhdmVEZURlbW9QYXJhSmF2YU5vYmVDb25Eb2NrZXIyMDI2IQ==}
     expiration-ms: ${JWT_EXPIRATION_MS:300000}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://localhost:8761/eureka/}}
