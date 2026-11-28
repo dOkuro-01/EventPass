@@ -113,11 +113,22 @@ jobs:
             mysql_root_password=$(sed -n 's/^MYSQL_ROOT_PASSWORD=//p' "$HOME/EventPass/.env" | head -n 1 | tr -d '\r')
             if [[ -n "$mysql_root_password" ]]; then
               echo "::add-mask::$mysql_root_password"
-              echo "MYSQL_ROOT_PASSWORD=$mysql_root_password" >> "$GITHUB_ENV"
+              printf 'MYSQL_ROOT_PASSWORD=%s\n' "$mysql_root_password" >> "$GITHUB_ENV"
               MYSQL_ROOT_PASSWORD="$mysql_root_password"
             fi
           fi
-          : "${MYSQL_ROOT_PASSWORD:?Falta configurar MYSQL_ROOT_PASSWORD como secreto de Actions o en $HOME/EventPass/.env}"
+          if [[ -z "$MYSQL_ROOT_PASSWORD" ]]; then
+            mysql_container=$(sudo docker ps --filter 'name=eventpass-mysql' --format '{{.Names}}' | head -n 1)
+            if [[ -n "$mysql_container" ]]; then
+              mysql_root_password=$(sudo docker inspect "$mysql_container" --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^MYSQL_ROOT_PASSWORD=//p' | head -n 1)
+              if [[ -n "$mysql_root_password" ]]; then
+                echo "::add-mask::$mysql_root_password"
+                printf 'MYSQL_ROOT_PASSWORD=%s\n' "$mysql_root_password" >> "$GITHUB_ENV"
+                MYSQL_ROOT_PASSWORD="$mysql_root_password"
+              fi
+            fi
+          fi
+          : "${MYSQL_ROOT_PASSWORD:?Falta MYSQL_ROOT_PASSWORD como secreto de Actions, en $HOME/EventPass/.env o en el contenedor eventpass-mysql existente}"
           : "${INTERNAL_API_TOKEN:?Falta configurar el secreto INTERNAL_API_TOKEN en GitHub Actions}"
       - name: Resolver salidas de SAM y autenticar ECR
         id: aws
