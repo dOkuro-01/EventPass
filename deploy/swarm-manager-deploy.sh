@@ -46,9 +46,11 @@ docker stack deploy \
   eventpass
 
 for attempt in {1..60}; do
-  status=$(curl -sS --max-time 3 -o /dev/null -w '%{http_code}' \
-    http://localhost:8080/api/eventos || true)
-  if [[ "$status" == "200" ]]; then
+  gateway_container=$(docker ps \
+    --filter 'label=com.docker.swarm.service.name=eventpass_api-gateway' \
+    --filter status=running --format '{{.ID}}' | head -n 1)
+  if [[ -n "$gateway_container" ]] && docker exec "$gateway_container" \
+    wget -q -O /dev/null -T 5 http://127.0.0.1:8080/api/eventos; then
     echo "Docker Swarm desplegado; API Gateway respondió HTTP 200."
     docker stack services eventpass
     exit 0
