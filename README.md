@@ -14,4 +14,4 @@ Consulta [la guía de SQS, Lambda y CloudWatch](docs/SQS_LAMBDA_CLOUDWATCH.md) p
 2. Ejecuta `docker compose up --build -d`.
 3. Para crear órdenes y emitir tickets en modo AWS, configura `AWS_REGION`, `PEDIDOS_QUEUE_URL` e `INTERNAL_API_TOKEN` como se describe en la guía de SQS. La EC2 debe usar un perfil IAM con permiso limitado para enviar mensajes.
 
-El workflow verifica cada módulo Maven por separado porque el repositorio no tiene un POM raíz. En `main`, crea/actualiza SQS, Lambda, CloudWatch y ECR mediante SAM, publica las seis imágenes y despliega el stack en el runner Swarm manager etiquetado `eventpass-manager`. Requiere roles AWS OIDC y secretos/variables de GitHub explicados en la guía de CI/CD.
+El workflow verifica cada módulo Maven por separado porque el repositorio no tiene un POM raíz. En `main`, crea/actualiza SQS, Lambda, CloudWatch y ECR mediante SAM, publica las seis imágenes y despliega el stack en el runner Swarm manager etiquetado `eventpass-manager`. AWS CLI y SAM usan el perfil IAM de la EC2; los secretos y variables de aplicación se describen en la guía de CI/CD.

@@ -54,7 +54,7 @@ Si el manager reinicia, Swarm conserva el estado local. Guarda de forma segura e
 
 ## Secretos y permisos de AWS
 
-El rol de instancia de cada nodo que pueda ejecutar `ordenes` necesita `sqs:SendMessage` limitado a la cola `laboratorio-pedidos`; usa `aws/iam/ec2-sqs-send-policy.json`. El rol OIDC de GitHub para publicar imágenes está descrito en `aws/iam/github-actions-deploy-policy.json`. El SDK Java usa el proveedor de credenciales de EC2, no claves AWS dentro del contenedor. Habilita IMDSv2 y configura el hop limit en 2 para que los contenedores puedan obtener credenciales; no desactives IMDSv2.
+El perfil IAM del manager que ejecuta GitHub Actions necesita los permisos descritos en [la guía de CI/CD](CI_CD_GITHUB_ACTIONS.md) para SAM y ECR. El perfil de cada nodo que pueda ejecutar `ordenes` necesita `sqs:SendMessage` limitado a la cola `laboratorio-pedidos`; usa `aws/iam/ec2-sqs-send-policy.json`. El SDK Java usa el proveedor de credenciales de EC2, no claves AWS dentro del contenedor. Habilita IMDSv2 y configura el hop limit en 2 para que los contenedores puedan obtener credenciales; no desactives IMDSv2.
 
 El entorno de despliegue se entrega temporalmente al script desde GitHub Actions. El script no escribe `.env` dentro del checkout y elimina su archivo temporal al terminar. Mantén iguales `MYSQL_ROOT_PASSWORD` e `INTERNAL_API_TOKEN` entre los despliegues; conserva la contraseña del volumen MySQL que ya exista.
 
