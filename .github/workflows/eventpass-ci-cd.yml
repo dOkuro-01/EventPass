@@ -117,6 +117,15 @@ jobs:
             --output text)
           test -n "$queue_url"
           registry="$account_id.dkr.ecr.$AWS_REGION.amazonaws.com"
+          for service in autenticacion eventos ordenes tickets eureka-server api-gateway; do
+            repository="eventpass/$service"
+            if ! aws ecr describe-repositories --region "$AWS_REGION" \
+              --repository-names "$repository" >/dev/null 2>&1; then
+              aws ecr create-repository --region "$AWS_REGION" \
+                --repository-name "$repository" \
+                --image-scanning-configuration scanOnPush=true >/dev/null
+            fi
+          done
           aws ecr get-login-password --region "$AWS_REGION" \
             | docker login --username AWS --password-stdin "$registry"
           echo "registry=$registry" >> "$GITHUB_OUTPUT"

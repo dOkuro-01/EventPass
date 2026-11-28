@@ -11,62 +11,7 @@ Parameters:
     NoEcho: true
     MinLength: 32
     Description: Secreto compartido entre Lambda y los endpoints internos de EventPass.
-  EcrRepositoryPrefix:
-    Type: String
-    Default: eventpass
-    AllowedPattern: '^[a-z0-9]+([._/-][a-z0-9]+)*$'
-    Description: Prefijo para los repositorios de imágenes Docker.
-
 Resources:
-  AutenticacionRepository:
-    Type: AWS::ECR::Repository
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      RepositoryName: !Sub '${EcrRepositoryPrefix}/autenticacion'
-      ImageScanningConfiguration:
-        ScanOnPush: true
-  EventosRepository:
-    Type: AWS::ECR::Repository
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      RepositoryName: !Sub '${EcrRepositoryPrefix}/eventos'
-      ImageScanningConfiguration:
-        ScanOnPush: true
-  OrdenesRepository:
-    Type: AWS::ECR::Repository
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      RepositoryName: !Sub '${EcrRepositoryPrefix}/ordenes'
-      ImageScanningConfiguration:
-        ScanOnPush: true
-  TicketsRepository:
-    Type: AWS::ECR::Repository
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      RepositoryName: !Sub '${EcrRepositoryPrefix}/tickets'
-      ImageScanningConfiguration:
-        ScanOnPush: true
-  EurekaRepository:
-    Type: AWS::ECR::Repository
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      RepositoryName: !Sub '${EcrRepositoryPrefix}/eureka-server'
-      ImageScanningConfiguration:
-        ScanOnPush: true
-  GatewayRepository:
-    Type: AWS::ECR::Repository
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      RepositoryName: !Sub '${EcrRepositoryPrefix}/api-gateway'
-      ImageScanningConfiguration:
-        ScanOnPush: true
-
   PedidosQueue:
     Type: AWS::SQS::Queue
     Properties:
@@ -82,35 +27,6 @@ Resources:
       LogGroupName: /aws/lambda/laboratorio-receptor-pedidos
       RetentionInDays: 14
 
-  OrderIssuerRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: ReceivePedidosAndWriteLogs
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Sid: ReadAndDeleteMessagesFromPedidosQueue
-                Effect: Allow
-                Action:
-                  - sqs:ReceiveMessage
-                  - sqs:DeleteMessage
-                  - sqs:GetQueueAttributes
-                Resource: !GetAtt PedidosQueue.Arn
-              - Sid: WriteLambdaLogs
-                Effect: Allow
-                Action:
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/laboratorio-receptor-pedidos:*
-
   OrderIssuerFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -120,7 +36,9 @@ Resources:
       Runtime: python3.13
       Timeout: 10
       MemorySize: 128
-      Role: !GetAtt OrderIssuerRole.Arn
+      # AWS Academy bloquea iam:CreateRole para LabRole. Este rol preexistente
+      # ya confía en lambda.amazonaws.com y es el rol estándar del laboratorio.
+      Role: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/LabRole
       Environment:
         Variables:
           EVENTPASS_API_BASE_URL: !Ref EventPassApiBaseUrl
@@ -144,6 +62,3 @@ Outputs:
   OrderIssuerFunctionName:
     Description: Función que consume órdenes y emite tickets.
     Value: !Ref OrderIssuerFunction
-  EcrRegistry:
-    Description: Registro ECR para las seis aplicaciones de EventPass.
-    Value: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.${AWS::URLSuffix}'
