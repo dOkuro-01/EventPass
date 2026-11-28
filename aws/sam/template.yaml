@@ -1,0 +1,92 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Cola de órdenes y Lambda emisora de tickets para EventPass.
+
+Parameters:
+  EventPassApiBaseUrl:
+    Type: String
+    Description: URL HTTPS de API Gateway que enruta las rutas /api hacia EventPass.
+  InternalApiToken:
+    Type: String
+    NoEcho: true
+    MinLength: 32
+    Description: Secreto compartido entre Lambda y los endpoints internos de EventPass.
+
+Resources:
+  PedidosQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: laboratorio-pedidos
+      VisibilityTimeout: 60
+      MessageRetentionPeriod: 345600
+      DelaySeconds: 0
+      SqsManagedSseEnabled: true
+
+  LambdaLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/laboratorio-receptor-pedidos
+      RetentionInDays: 14
+
+  OrderIssuerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ReceivePedidosAndWriteLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ReadAndDeleteMessagesFromPedidosQueue
+                Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: !GetAtt PedidosQueue.Arn
+              - Sid: WriteLambdaLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/laboratorio-receptor-pedidos:*
+
+  OrderIssuerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: laboratorio-receptor-pedidos
+      CodeUri: ../lambda/order-issuer/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.13
+      Timeout: 10
+      MemorySize: 128
+      Role: !GetAtt OrderIssuerRole.Arn
+      Environment:
+        Variables:
+          EVENTPASS_API_BASE_URL: !Ref EventPassApiBaseUrl
+          INTERNAL_API_TOKEN: !Ref InternalApiToken
+          API_TIMEOUT_SECONDS: '4'
+      Events:
+        Pedidos:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt PedidosQueue.Arn
+            BatchSize: 1
+            MaximumBatchingWindowInSeconds: 0
+
+Outputs:
+  PedidosQueueUrl:
+    Description: URL que usa el microservicio de órdenes para publicar mensajes.
+    Value: !Ref PedidosQueue
+  PedidosQueueArn:
+    Description: ARN de la cola para las políticas IAM.
+    Value: !GetAtt PedidosQueue.Arn
+  OrderIssuerFunctionName:
+    Description: Función que consume órdenes y emite tickets.
+    Value: !Ref OrderIssuerFunction

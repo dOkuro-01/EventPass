@@ -19,6 +19,11 @@ server:
   port: ${SERVER_PORT:8081}
 
 app:
+  aws:
+    region: ${AWS_REGION:us-east-1}
+  sqs:
+    queue-url: ${PEDIDOS_QUEUE_URL:}
+  internal-token: ${INTERNAL_API_TOKEN:}
   jwt:
     secret: ${JWT_SECRET:Q2xhdmVEZURlbW9QYXJhSmF2YU5vYmVDb25Eb2NrZXIyMDI2IQ==}
     expiration-ms: ${JWT_EXPIRATION_MS:300000}

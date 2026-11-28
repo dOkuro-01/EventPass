@@ -3,6 +3,8 @@ package com.eventpass.eventos.service;
 import com.eventpass.eventos.dto.EventoRequest;
 import com.eventpass.eventos.model.Evento;
 import com.eventpass.eventos.repository.EventoRepository;
+import com.eventpass.eventos.model.ReservaAforo;
+import com.eventpass.eventos.repository.ReservaAforoRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,9 +17,11 @@ import java.util.List;
 public class EventoService {
 
     private final EventoRepository repository;
+    private final ReservaAforoRepository reservas;
 
-    public EventoService(EventoRepository repository) {
+    public EventoService(EventoRepository repository, ReservaAforoRepository reservas) {
         this.repository = repository;
+        this.reservas = reservas;
     }
 
     @Transactional(readOnly = true)
@@ -82,6 +86,40 @@ public class EventoService {
                     "Evento no publicado o aforo insuficiente");
         }
         return buscar(id);
+    }
+
+    public ReservaAforo reservarParaOrden(Long eventoId, Long ordenId, Integer cantidad) {
+        if (ordenId == null || cantidad == null || cantidad < 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Debe indicar una orden y una cantidad mayor que cero");
+        }
+
+        var existente = reservas.findByOrdenId(ordenId);
+        if (existente.isPresent()) {
+            ReservaAforo reserva = existente.get();
+            if (!reserva.getEventoId().equals(eventoId) || !reserva.getCantidad().equals(cantidad)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "La orden ya reservó un aforo diferente");
+            }
+            return reserva;
+        }
+
+        Evento evento = repository.findByIdForUpdate(eventoId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Evento no encontrado"));
+        if (!"PUBLICADO".equals(evento.getEstado()) || evento.getAforoDisponible() < cantidad) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Evento no publicado o aforo insuficiente");
+        }
+
+        evento.setAforoDisponible(evento.getAforoDisponible() - cantidad);
+        repository.save(evento);
+
+        ReservaAforo reserva = new ReservaAforo();
+        reserva.setOrdenId(ordenId);
+        reserva.setEventoId(eventoId);
+        reserva.setCantidad(cantidad);
+        return reservas.saveAndFlush(reserva);
     }
 
     public void eliminar(Long id) {

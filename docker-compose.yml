@@ -4,7 +4,7 @@ services:
     container_name: eventpass-mysql
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-RootDemo123!}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Define MYSQL_ROOT_PASSWORD en .env}
     command:
       - --init-file
       - /data/application/init.sql
@@ -14,7 +14,7 @@ services:
       - mysql_data:/var/lib/mysql
       - ./init-db.sql:/data/application/init.sql:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-RootDemo123!}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:?Define MYSQL_ROOT_PASSWORD en .env}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -22,7 +22,9 @@ services:
       - eventpass-net
 
   eureka-server:
-    build: ./eureka-server
+    build:
+      context: ./eureka-server
+      dockerfile: dockerfile
     container_name: eventpass-eureka
     restart: always
     environment:
@@ -40,7 +42,8 @@ services:
       SERVER_PORT: 8083
       DB_URL: jdbc:mysql://mysql-db:3306/eventpass_usuarios?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
       DB_USER: root
-      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-RootDemo123!}
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Define MYSQL_ROOT_PASSWORD en .env}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-}
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
     depends_on:
       mysql-db:
@@ -58,7 +61,8 @@ services:
       SERVER_PORT: 8084
       DB_URL: jdbc:mysql://mysql-db:3306/eventpass_eventos?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
       DB_USER: root
-      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-RootDemo123!}
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Define MYSQL_ROOT_PASSWORD en .env}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-}
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
     depends_on:
       mysql-db:
@@ -76,8 +80,11 @@ services:
       SERVER_PORT: 8081
       DB_URL: jdbc:mysql://mysql-db:3306/eventpass_ordenes?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
       DB_USER: root
-      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-RootDemo123!}
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Define MYSQL_ROOT_PASSWORD en .env}
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      PEDIDOS_QUEUE_URL: ${PEDIDOS_QUEUE_URL:-}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-}
     depends_on:
       mysql-db:
         condition: service_healthy
@@ -94,7 +101,8 @@ services:
       SERVER_PORT: 8082
       DB_URL: jdbc:mysql://mysql-db:3306/eventpass_tickets?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
       DB_USER: root
-      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-RootDemo123!}
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Define MYSQL_ROOT_PASSWORD en .env}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-}
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
     depends_on:
       mysql-db:
@@ -105,7 +113,9 @@ services:
       - eventpass-net
 
   api-gateway:
-    build: ./api-gateway
+    build:
+      context: ./api-gateway
+      dockerfile: dockerfile
     container_name: eventpass-gateway
     restart: always
     environment:

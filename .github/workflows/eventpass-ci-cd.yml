@@ -1,0 +1,89 @@
+name: EventPass CI y despliegue EC2
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eventpass-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: Verificar ${{ matrix.module }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - module: autenticacion
+            java-version: '17'
+          - module: eventos
+            java-version: '17'
+          - module: ordenes
+            java-version: '21'
+          - module: tickets
+            java-version: '21'
+          - module: eureka-server
+            java-version: '21'
+          - module: api-gateway
+            java-version: '21'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java-version }}
+          cache: maven
+          cache-dependency-path: ${{ matrix.module }}/pom.xml
+      - name: Compilar y ejecutar pruebas
+        run: mvn -B -f "${{ matrix.module }}/pom.xml" verify
+
+  deploy:
+    name: Desplegar EventPass en EC2
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, linux, x64, eventpass-ec2]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Actualizar servicios con Docker Compose
+        shell: bash
+        run: |
+          set -euo pipefail
+          env_file="$HOME/EventPass/.env"
+          test -r "$env_file"
+          compose() {
+            docker compose \
+              --env-file "$env_file" \
+              --project-name eventpass \
+              --parallel 2 \
+              -f "$GITHUB_WORKSPACE/docker-compose.yml" "$@"
+          }
+          compose config --quiet
+          compose up --build -d --wait --wait-timeout 240
+          compose ps
+      - name: Comprobar el API Gateway de EventPass
+        shell: bash
+        run: |
+          set -euo pipefail
+          for intento in {1..30}; do
+            code=$(curl -s --max-time 3 -o /dev/null -w '%{http_code}' \
+              http://localhost:8080/api/eventos || true)
+            if [[ "$code" == "200" ]]; then
+              echo "eventos HTTP 200"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::El Gateway no devolvió HTTP 200 en /api/eventos"
+          exit 1

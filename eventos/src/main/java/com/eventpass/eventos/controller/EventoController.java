@@ -1,7 +1,10 @@
 package com.eventpass.eventos.controller;
 
 import com.eventpass.eventos.dto.EventoRequest;
+import com.eventpass.eventos.dto.ReservaAforoRequest;
 import com.eventpass.eventos.model.Evento;
+import com.eventpass.eventos.model.ReservaAforo;
+import com.eventpass.eventos.security.InternalTokenValidator;
 import com.eventpass.eventos.service.EventoService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -24,9 +27,11 @@ import org.springframework.web.server.ResponseStatusException;
 public class EventoController {
 
     private final EventoService service;
+    private final InternalTokenValidator internalTokenValidator;
 
-    public EventoController(EventoService service) {
+    public EventoController(EventoService service, InternalTokenValidator internalTokenValidator) {
         this.service = service;
+        this.internalTokenValidator = internalTokenValidator;
     }
 
     @GetMapping
@@ -56,6 +61,15 @@ public class EventoController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Debe indicar cantidad");
         }
         return service.reservar(id, cantidad);
+    }
+
+    @PostMapping("/{id}/reservas")
+    public ReservaAforo reservarParaOrden(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-Internal-Token", required = false) String token,
+            @Valid @RequestBody ReservaAforoRequest request) {
+        internalTokenValidator.validar(token);
+        return service.reservarParaOrden(id, request.ordenId(), request.cantidad());
     }
 
     @DeleteMapping("/{id}")
