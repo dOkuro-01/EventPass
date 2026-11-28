@@ -104,11 +104,13 @@ jobs:
         shell: bash
         run: sudo bash swarm/init-manager.sh >/dev/null
       - name: Comprobar que este runner es el manager Swarm
+        shell: bash
         run: |
-          test "$(sudo docker info --format '{{.Swarm.LocalNodeState}}')" = "active"
-          sudo docker node ls >/dev/null
-          test -n "$MYSQL_ROOT_PASSWORD"
-          test -n "$INTERNAL_API_TOKEN"
+          set -euo pipefail
+          sudo docker info --format 'Estado local Swarm: {{.Swarm.LocalNodeState}}'
+          sudo docker node ls
+          : "${MYSQL_ROOT_PASSWORD:?Falta configurar el secreto MYSQL_ROOT_PASSWORD en GitHub Actions}"
+          : "${INTERNAL_API_TOKEN:?Falta configurar el secreto INTERNAL_API_TOKEN en GitHub Actions}"
       - name: Resolver salidas de SAM y autenticar ECR
         id: aws
         shell: bash
