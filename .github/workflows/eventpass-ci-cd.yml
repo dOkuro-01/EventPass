@@ -1,4 +1,4 @@
-name: EventPass CI y despliegue EC2
+name: EventPass CI, AWS SAM y Docker Swarm
 
 on:
   push:
@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   ci:
-    name: Verificar ${{ matrix.module }}
+    name: Build y pruebas de ${{ matrix.module }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -46,44 +46,124 @@ jobs:
       - name: Compilar y ejecutar pruebas
         run: mvn -B -f "${{ matrix.module }}/pom.xml" verify
 
-  deploy:
-    name: Desplegar EventPass en EC2
+  provision-serverless:
+    name: Proveer SQS, Lambda y ECR con SAM
     needs: ci
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: [self-hosted, linux, x64, eventpass-ec2]
-    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      SAM_STACK_NAME: eventpass-serverless
+      EVENTPASS_API_BASE_URL: ${{ vars.EVENTPASS_API_BASE_URL }}
+      INTERNAL_API_TOKEN: ${{ secrets.INTERNAL_API_TOKEN }}
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Actualizar servicios con Docker Compose
+      - uses: aws-actions/setup-sam@v3
+        with:
+          use-installer: true
+      - name: Validar plantilla SAM
+        run: sam validate --lint --template-file aws/sam/template.yaml
+      - uses: aws-actions/configure-aws-credentials@v6.3.1
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_SAM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: eventpass-sam-${{ github.run_id }}
+      - name: Construir y desplegar recursos serverless
         shell: bash
         run: |
           set -euo pipefail
-          env_file="$HOME/EventPass/.env"
-          test -r "$env_file"
-          compose() {
-            docker compose \
-              --env-file "$env_file" \
-              --project-name eventpass \
-              --parallel 2 \
-              -f "$GITHUB_WORKSPACE/docker-compose.yml" "$@"
+          test -n "$EVENTPASS_API_BASE_URL"
+          test -n "$INTERNAL_API_TOKEN"
+          sam build --template-file aws/sam/template.yaml
+          sam deploy \
+            --template-file .aws-sam/build/template.yaml \
+            --stack-name "$SAM_STACK_NAME" \
+            --region "$AWS_REGION" \
+            --resolve-s3 \
+            --capabilities CAPABILITY_IAM \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides \
+              EventPassApiBaseUrl="$EVENTPASS_API_BASE_URL" \
+              InternalApiToken="$INTERNAL_API_TOKEN"
+
+  deploy-swarm:
+    name: Publicar imágenes y desplegar en Docker Swarm
+    needs: provision-serverless
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, linux, x64, eventpass-manager]
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      SAM_STACK_NAME: eventpass-serverless
+      MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+      INTERNAL_API_TOKEN: ${{ secrets.INTERNAL_API_TOKEN }}
+      IMAGE_TAG: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: aws-actions/configure-aws-credentials@v6.3.1
+        with:
+          role-to-assume: ${{ secrets.AWS_GITHUB_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: eventpass-swarm-${{ github.run_id }}
+      - name: Comprobar que este runner es el manager Swarm
+        run: |
+          test "$(docker info --format '{{.Swarm.ControlAvailable}}')" = "true"
+          test -n "$MYSQL_ROOT_PASSWORD"
+          test -n "$INTERNAL_API_TOKEN"
+      - name: Resolver salidas de SAM y autenticar ECR
+        id: aws
+        shell: bash
+        run: |
+          set -euo pipefail
+          account_id=$(aws sts get-caller-identity --query Account --output text)
+          queue_url=$(aws cloudformation describe-stacks \
+            --stack-name "$SAM_STACK_NAME" --region "$AWS_REGION" \
+            --query "Stacks[0].Outputs[?OutputKey=='PedidosQueueUrl'].OutputValue | [0]" \
+            --output text)
+          test -n "$queue_url"
+          registry="$account_id.dkr.ecr.$AWS_REGION.amazonaws.com"
+          aws ecr get-login-password --region "$AWS_REGION" \
+            | docker login --username AWS --password-stdin "$registry"
+          echo "registry=$registry" >> "$GITHUB_OUTPUT"
+          echo "queue_url=$queue_url" >> "$GITHUB_OUTPUT"
+      - name: Construir y publicar las seis imágenes
+        shell: bash
+        env:
+          ECR_REGISTRY: ${{ steps.aws.outputs.registry }}
+        run: |
+          set -euo pipefail
+          build_push() {
+            local service="$1" dockerfile="$2"
+            docker build --pull -f "$dockerfile" -t "$ECR_REGISTRY/eventpass/$service:$IMAGE_TAG" "$service"
+            docker push "$ECR_REGISTRY/eventpass/$service:$IMAGE_TAG"
           }
-          compose config --quiet
-          compose up --build -d --wait --wait-timeout 240
-          compose ps
-      - name: Comprobar el API Gateway de EventPass
+          build_push autenticacion autenticacion/Dockerfile
+          build_push eventos eventos/Dockerfile
+          build_push ordenes ordenes/Dockerfile
+          build_push tickets tickets/Dockerfile
+          build_push eureka-server eureka-server/dockerfile
+          build_push api-gateway api-gateway/dockerfile
+      - name: Desplegar stack y verificar el Gateway
         shell: bash
+        env:
+          ECR_REGISTRY: ${{ steps.aws.outputs.registry }}
+          PEDIDOS_QUEUE_URL: ${{ steps.aws.outputs.queue_url }}
         run: |
           set -euo pipefail
-          for intento in {1..30}; do
-            code=$(curl -s --max-time 3 -o /dev/null -w '%{http_code}' \
-              http://localhost:8080/api/eventos || true)
-            if [[ "$code" == "200" ]]; then
-              echo "eventos HTTP 200"
-              exit 0
-            fi
-            sleep 5
-          done
-          echo "::error::El Gateway no devolvió HTTP 200 en /api/eventos"
-          exit 1
+          deploy/swarm-manager-deploy.sh -
+      - name: Cerrar sesión de ECR
+        if: always() && steps.aws.outputs.registry != ''
+        env:
+          ECR_REGISTRY: ${{ steps.aws.outputs.registry }}
+        run: docker logout "$ECR_REGISTRY" || true

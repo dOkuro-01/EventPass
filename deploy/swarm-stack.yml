@@ -1,0 +1,131 @@
+version: '3.8'
+
+services:
+  mysql-db:
+    image: mysql:8.4
+    command:
+      - --init-file
+      - /data/application/init.sql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Define MYSQL_ROOT_PASSWORD}
+    configs:
+      - source: eventpass-init-db
+        target: /data/application/init.sql
+        mode: 0444
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - eventpass-net
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.labels.eventpass.db == true
+
+  eureka-server:
+    image: ${ECR_REGISTRY:?Define ECR_REGISTRY}/eventpass/eureka-server:${IMAGE_TAG:?Define IMAGE_TAG}
+    environment:
+      SERVER_PORT: 8761
+    networks:
+      - eventpass-net
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  autenticacion:
+    image: ${ECR_REGISTRY:?Define ECR_REGISTRY}/eventpass/autenticacion:${IMAGE_TAG:?Define IMAGE_TAG}
+    environment:
+      SERVER_PORT: 8083
+      DB_URL: jdbc:mysql://mysql-db:3306/eventpass_usuarios?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+      DB_USER: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Define MYSQL_ROOT_PASSWORD}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?Define INTERNAL_API_TOKEN}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    networks:
+      - eventpass-net
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  eventos:
+    image: ${ECR_REGISTRY:?Define ECR_REGISTRY}/eventpass/eventos:${IMAGE_TAG:?Define IMAGE_TAG}
+    environment:
+      SERVER_PORT: 8084
+      DB_URL: jdbc:mysql://mysql-db:3306/eventpass_eventos?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+      DB_USER: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Define MYSQL_ROOT_PASSWORD}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?Define INTERNAL_API_TOKEN}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    networks:
+      - eventpass-net
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  ordenes:
+    image: ${ECR_REGISTRY:?Define ECR_REGISTRY}/eventpass/ordenes:${IMAGE_TAG:?Define IMAGE_TAG}
+    environment:
+      SERVER_PORT: 8081
+      DB_URL: jdbc:mysql://mysql-db:3306/eventpass_ordenes?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+      DB_USER: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Define MYSQL_ROOT_PASSWORD}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      AWS_REGION: ${AWS_REGION:?Define AWS_REGION}
+      PEDIDOS_QUEUE_URL: ${PEDIDOS_QUEUE_URL:?Define PEDIDOS_QUEUE_URL}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?Define INTERNAL_API_TOKEN}
+    networks:
+      - eventpass-net
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  tickets:
+    image: ${ECR_REGISTRY:?Define ECR_REGISTRY}/eventpass/tickets:${IMAGE_TAG:?Define IMAGE_TAG}
+    environment:
+      SERVER_PORT: 8082
+      DB_URL: jdbc:mysql://mysql-db:3306/eventpass_tickets?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+      DB_USER: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Define MYSQL_ROOT_PASSWORD}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?Define INTERNAL_API_TOKEN}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    networks:
+      - eventpass-net
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  api-gateway:
+    image: ${ECR_REGISTRY:?Define ECR_REGISTRY}/eventpass/api-gateway:${IMAGE_TAG:?Define IMAGE_TAG}
+    environment:
+      SERVER_PORT: 8080
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    ports:
+      - target: 8080
+        published: 8080
+        protocol: tcp
+        mode: ingress
+    networks:
+      - eventpass-net
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+networks:
+  eventpass-net:
+    driver: overlay
+
+volumes:
+  mysql_data:
+    driver: local
+
+configs:
+  eventpass-init-db:
+    file: ../init-db.sql

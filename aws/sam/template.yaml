@@ -11,8 +11,56 @@ Parameters:
     NoEcho: true
     MinLength: 32
     Description: Secreto compartido entre Lambda y los endpoints internos de EventPass.
+  EcrRepositoryPrefix:
+    Type: String
+    Default: eventpass
+    AllowedPattern: '^[a-z0-9]+([._/-][a-z0-9]+)*$'
+    Description: Prefijo para los repositorios de imágenes Docker.
 
 Resources:
+  AutenticacionRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    Properties:
+      RepositoryName: !Sub '${EcrRepositoryPrefix}/autenticacion'
+      ImageScanningConfiguration:
+        ScanOnPush: true
+  EventosRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    Properties:
+      RepositoryName: !Sub '${EcrRepositoryPrefix}/eventos'
+      ImageScanningConfiguration:
+        ScanOnPush: true
+  OrdenesRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    Properties:
+      RepositoryName: !Sub '${EcrRepositoryPrefix}/ordenes'
+      ImageScanningConfiguration:
+        ScanOnPush: true
+  TicketsRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    Properties:
+      RepositoryName: !Sub '${EcrRepositoryPrefix}/tickets'
+      ImageScanningConfiguration:
+        ScanOnPush: true
+  EurekaRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    Properties:
+      RepositoryName: !Sub '${EcrRepositoryPrefix}/eureka-server'
+      ImageScanningConfiguration:
+        ScanOnPush: true
+  GatewayRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    Properties:
+      RepositoryName: !Sub '${EcrRepositoryPrefix}/api-gateway'
+      ImageScanningConfiguration:
+        ScanOnPush: true
+
   PedidosQueue:
     Type: AWS::SQS::Queue
     Properties:
@@ -90,3 +138,6 @@ Outputs:
   OrderIssuerFunctionName:
     Description: Función que consume órdenes y emite tickets.
     Value: !Ref OrderIssuerFunction
+  EcrRegistry:
+    Description: Registro ECR para las seis aplicaciones de EventPass.
+    Value: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.${AWS::URLSuffix}'
