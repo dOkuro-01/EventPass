@@ -105,7 +105,7 @@ jobs:
         run: sudo bash swarm/init-manager.sh >/dev/null
       - name: Comprobar que este runner es el manager Swarm
         run: |
-          test "$(docker info --format '{{.Swarm.ControlAvailable}}')" = "true"
+          test "$(sudo docker info --format '{{.Swarm.ControlAvailable}}')" = "true"
           test -n "$MYSQL_ROOT_PASSWORD"
           test -n "$INTERNAL_API_TOKEN"
       - name: Resolver salidas de SAM y autenticar ECR
@@ -130,7 +130,7 @@ jobs:
             fi
           done
           aws ecr get-login-password --region "$AWS_REGION" \
-            | docker login --username AWS --password-stdin "$registry"
+            | sudo docker login --username AWS --password-stdin "$registry"
           echo "registry=$registry" >> "$GITHUB_OUTPUT"
           echo "queue_url=$queue_url" >> "$GITHUB_OUTPUT"
       - name: Construir y publicar las seis imágenes
@@ -141,8 +141,8 @@ jobs:
           set -euo pipefail
           build_push() {
             local service="$1" dockerfile="$2"
-            docker build --pull -f "$dockerfile" -t "$ECR_REGISTRY/eventpass/$service:$IMAGE_TAG" "$service"
-            docker push "$ECR_REGISTRY/eventpass/$service:$IMAGE_TAG"
+            sudo docker build --pull -f "$dockerfile" -t "$ECR_REGISTRY/eventpass/$service:$IMAGE_TAG" "$service"
+            sudo docker push "$ECR_REGISTRY/eventpass/$service:$IMAGE_TAG"
           }
           build_push autenticacion autenticacion/Dockerfile
           build_push eventos eventos/Dockerfile
@@ -157,9 +157,9 @@ jobs:
           PEDIDOS_QUEUE_URL: ${{ steps.aws.outputs.queue_url }}
         run: |
           set -euo pipefail
-          deploy/swarm-manager-deploy.sh -
+          sudo -E bash deploy/swarm-manager-deploy.sh -
       - name: Cerrar sesión de ECR
         if: always() && steps.aws.outputs.registry != ''
         env:
           ECR_REGISTRY: ${{ steps.aws.outputs.registry }}
-        run: docker logout "$ECR_REGISTRY" || true
+        run: sudo docker logout "$ECR_REGISTRY" || true
