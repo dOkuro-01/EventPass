@@ -105,7 +105,8 @@ jobs:
         run: sudo bash swarm/init-manager.sh >/dev/null
       - name: Comprobar que este runner es el manager Swarm
         run: |
-          test "$(sudo docker info --format '{{.Swarm.ControlAvailable}}')" = "true"
+          test "$(sudo docker info --format '{{.Swarm.LocalNodeState}}')" = "active"
+          sudo docker node ls >/dev/null
           test -n "$MYSQL_ROOT_PASSWORD"
           test -n "$INTERNAL_API_TOKEN"
       - name: Resolver salidas de SAM y autenticar ECR
