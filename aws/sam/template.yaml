@@ -21,6 +21,7 @@ Resources:
   AutenticacionRepository:
     Type: AWS::ECR::Repository
     DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       RepositoryName: !Sub '${EcrRepositoryPrefix}/autenticacion'
       ImageScanningConfiguration:
@@ -28,6 +29,7 @@ Resources:
   EventosRepository:
     Type: AWS::ECR::Repository
     DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       RepositoryName: !Sub '${EcrRepositoryPrefix}/eventos'
       ImageScanningConfiguration:
@@ -35,6 +37,7 @@ Resources:
   OrdenesRepository:
     Type: AWS::ECR::Repository
     DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       RepositoryName: !Sub '${EcrRepositoryPrefix}/ordenes'
       ImageScanningConfiguration:
@@ -42,6 +45,7 @@ Resources:
   TicketsRepository:
     Type: AWS::ECR::Repository
     DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       RepositoryName: !Sub '${EcrRepositoryPrefix}/tickets'
       ImageScanningConfiguration:
@@ -49,6 +53,7 @@ Resources:
   EurekaRepository:
     Type: AWS::ECR::Repository
     DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       RepositoryName: !Sub '${EcrRepositoryPrefix}/eureka-server'
       ImageScanningConfiguration:
@@ -56,6 +61,7 @@ Resources:
   GatewayRepository:
     Type: AWS::ECR::Repository
     DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       RepositoryName: !Sub '${EcrRepositoryPrefix}/api-gateway'
       ImageScanningConfiguration:
